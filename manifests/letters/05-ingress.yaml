@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tagebuch-ingress
+  namespace: letters
+spec:
+  rules:
+  - host: tagebuch.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: letters
+            port:
+              number: 80
