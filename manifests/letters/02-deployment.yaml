@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: letters
+  namespace: letters
+  labels:
+    app: letters
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: letters
+  template:
+    metadata:
+      labels:
+        app: letters
+    spec:
+      containers:
+      - name: letters
+        image: log1schebanane/tagebuch:1.1
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: data
+          mountPath: /var/opt/letters
+        env:
+        - name: letters_MODE
+          value: "prod"
+        - name: letters_PORT
+          value: "5230"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: letters
