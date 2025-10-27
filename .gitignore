@@ -1,0 +1,20 @@
+# Binaries
+argocd-linux-amd64
+argocd
+kubectl
+minikube
+*.exe
+*.deb
+
+# Kubernetes Secrets
+*-secret.yaml
+*.kubeconfig
+
+# Temporäre Dateien
+*.log
+*.tmp
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

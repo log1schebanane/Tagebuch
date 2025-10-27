@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: letters
+  namespace: letters
+  labels:
+    app: letters
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: letters
+  template:
+    metadata:
+      labels:
+        app: letters
+    spec:
+      containers:
+      - name: letters
+        image: neosmemo/letters:0.18.2
+        ports:
+        - containerPort: 5230
+          name: http
+        volumeMounts:
+        - name: data
+          mountPath: /var/opt/letters
+        env:
+        - name: letters_MODE
+          value: "prod"
+        - name: letters_PORT
+          value: "5230"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: letters-pvc
