@@ -1,0 +1,71 @@
+# mariadb-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mariadb-data-pvc
+  labels:
+    app: mariadb
+spec:
+  accessModes:
+    - ReadWriteOnce # Nur ein Pod kann gleichzeitig lesend/schreibend zugreifen
+  resources:
+    requests:
+      storage: 5Gi # Fordere 5 Gigabyte Speicherplatz an
+
+---
+
+# mariadb-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb-deployment
+  labels:
+    app: mariadb
+spec:
+  selector:
+    matchLabels:
+      app: mariadb
+  strategy:
+    type: Recreate # Stellt sicher, dass das PV nicht von mehreren Pods gleichzeitig genutzt wird
+  template:
+    metadata:
+      labels:
+        app: mariadb
+    spec:
+      containers:
+      - name: mariadb
+        image: mariadb:10.5 # Wähle ein stabiles Image
+        ports:
+        - containerPort: 3306
+          name: mariadb
+        env: # Umgebungsvariablen für die MariaDB Konfiguration
+        - name: MARIADB_ROOT_PASSWORD
+          value: "SuperSicheresRootPasswort" # WICHTIG: Ersetze dies durch ein starkes Passwort!
+        - name: MARIADB_DATABASE
+          value: "berichtsheft_db"
+        - name: MARIADB_USER
+          value: "azubi_user"
+        - name: MARIADB_PASSWORD
+          value: "AzubiPasswort" # WICHTIG: Ersetze dies durch ein starkes Passwort!
+        volumeMounts:
+        - name: mariadb-persistent-storage
+          mountPath: /var/lib/mysql # Der Standardpfad, in dem MariaDB seine Daten speichert
+      volumes:
+      - name: mariadb-persistent-storage
+        persistentVolumeClaim:
+          claimName: mariadb-data-pvc # Bindung an den PVC aus Schritt 1
+
+---
+
+# mariadb-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-service # Der DNS-Name, den dein Backend verwenden wird
+spec:
+  selector:
+    app: mariadb
+  ports:
+    - port: 3306 # Port im Cluster
+      targetPort: 3306 # Port im Container
+  type: ClusterIP # Nur innerhalb des Clusters erreichbar

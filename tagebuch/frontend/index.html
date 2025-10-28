@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digitales Berichtsheft</title>
+    <style>
+        :root {
+            --primary-color: #2ECC71; /* Grüner für beruflichen Look */
+            --accent-color: #ECF0F1; 
+            --font-color: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #F8F9FA; 
+            color: var(--font-color);
+            line-height: 1.6;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+        }
+
+        /* Neue Eingabe-Sektion */
+        .input-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .input-grid label {
+            font-weight: bold;
+        }
+        
+        input[type="date"], input[type="number"] {
+            padding: 10px;
+            border: 1px solid #CCC;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 15px;
+            box-sizing: border-box;
+            border: 1px solid #CCC;
+            border-radius: 8px;
+            resize: vertical;
+            font-size: 1rem;
+            grid-column: 1 / -1; /* Nimmt beide Spalten ein */
+        }
+
+        button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #27AE60; 
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            background-color: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 5px solid var(--primary-color); /* Berichtsheft-Akzent */
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .entry-details {
+            flex-grow: 1; 
+        }
+
+        .entry-details strong {
+            display: block;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        
+        .duration-display {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-right: 20px;
+            white-space: nowrap;
+        }
+
+        .delete-btn {
+            background-color: transparent;
+            color: #FF4136; 
+            border: none;
+            padding: 0 5px;
+            font-size: 1.2rem;
+            transition: color 0.2s;
+        }
+
+        .delete-btn:hover {
+            color: #CC0000;
+        }
+
+        #totalTime {
+            background-color: #E6F7F0; /* Leichter grüner Hintergrund */
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+
+<h1>Digitales Berichtsheft 📊</h1>
+
+<div id="totalTime"></div>
+
+<script>
+// **********************************
+// JavaScript Logic (DB-API Integration)
+// **********************************
+
+// Wichtig: Verwende den Kubernetes Service Namen für die Kommunikation
+// ACHTUNG: Dies funktioniert nur, wenn das Frontend und Backend im selben K8s Cluster sind.
+// Wenn du CORS-Fehler bekommst, brauchst du einen Ingress Controller.
+const API_BASE_URL = "http://berichtsheft-api-service/api/entries";
+
+// ** 1. Passwortprüfung (wie gehabt) **
+const PASSWORD = "julia123"; 
+let input = prompt("Bitte Passwort eingeben:");
+if (input !== PASSWORD) {
+    document.body.innerHTML = "<h2>Zugriff verweigert 🛑</h2>";
+    throw new Error("Falsches Passwort");
+}
+
+// Globales Array (optional, kann aber nützlich sein)
+let entries = [];
+
+
+// --- 1. DATEN LADEN (GET Request) ---
+async function fetchEntries() {
+    try {
+        const response = await fetch(API_BASE_URL);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        // Speichere die geladenen Daten im globalen Array
+        entries = await response.json(); 
+        
+        renderEntries();
+
+    } catch (error) {
+        console.error("Fehler beim Laden der Einträge von der API:", error);
+        // Zeige einen Fehler im UI an, falls die API nicht erreichbar ist
+        document.getElementById("entriesList").innerHTML = 
+            `<li><strong style="color: #CC0000;">Fehler beim Verbinden zur API:</strong> ${error.message}. Ist der 'berichtsheft-api-service' erreichbar?</li>`;
+    }
+}
+
+// --- 2. DATEN SPEICHERN (POST Request) ---
+async function addEntry() {
+    // Holen der Werte aus den Eingabefeldern
+    const dateInput = document.getElementById("entryDate");
+    const durationInput = document.getElementById("entryDuration");
+    const textInput = document.getElementById("entryText");
+
+    const date = dateInput.value;
+    const duration = durationInput.value;
+    const text = textInput.value.trim();
+    
+    if (!date || !duration || !text || parseFloat(duration) <= 0) {
+        alert("Bitte Datum, gültige Dauer (> 0) und Beschreibung eingeben.");
+        return;
+    }
+    
+    const newEntry = { 
+        date: date, 
+        duration: parseFloat(duration), 
+        text: text 
+    };
+
+    try {
+        const response = await fetch(API_BASE_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            // Sende die Daten als JSON-String
+            body: JSON.stringify(newEntry)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Speichern fehlgeschlagen: ${response.statusText}`);
+        }
+
+        // Bei Erfolg die Felder zurücksetzen und die Liste neu laden
+        textInput.value = "";
+        durationInput.value = "";
+        fetchEntries(); // Lade die aktualisierte Liste von der DB
+        
+    } catch (error) {
+        alert(`Fehler beim Speichern: ${error.message}`);
+        console.error("POST Fehler:", error);
+    }
+}
+
+// --- 3. DATEN LÖSCHEN (Nicht in der API implementiert, Logik entfernt) ---
+// WICHTIG: Die DELETE-Logik wurde entfernt, da die API keinen DELETE-Endpunkt hat.
+// Um Einträge zu löschen, müsste der API-Code um eine DELETE-Route erweitert werden.
+function deleteEntry(id) {
+    alert("Löschen ist derzeit nicht möglich. Du musst den DELETE-Endpunkt in der API programmieren.");
+    // Beispiel für einen DELETE-Aufruf (wenn die API erweitert wird):
+    /*
+    if (!confirm("Bist du sicher, dass du diesen Eintrag löschen möchtest?")) return;
+    try {
+        await fetch(`${API_BASE_URL}/${id}`, { method: 'DELETE' });
+        fetchEntries();
+    } catch (error) {
+        console.error("DELETE Fehler:", error);
+    }
+    */
+}
+
+// --- 4. NUR RENDER-Funktion (UI-Update) ---
+function renderEntries() {
+    const list = document.getElementById("entriesList");
+    const totalTimeDisplay = document.getElementById("totalTime");
+    
+    if (!list || !totalTimeDisplay) return;
+
+    list.innerHTML = "";
+    let totalDuration = 0;
+
+    // Sortierung nach Datum (älteste zuerst)
+    const sortedEntries = entries.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    sortedEntries.forEach((e, index) => {
+        totalDuration += parseFloat(e.duration);
+
+        const li = document.createElement("li");
+        // ACHTUNG: Die ID (e.id) aus der DB ist wichtig für die DELETE-Funktion
+        li.innerHTML = `
+            <div class="entry-details">
+                <strong>${e.date} (${e.duration} h)</strong>
+                <div class="entry-text">${e.text.replace(/\n/g, '<br>')}</div>
+            </div>
+            <div class="duration-display">${e.duration} h</div>
+            <button class="delete-btn" onclick="deleteEntry(${e.id || 'null'})">🗑️</button>
+        `;
+        list.appendChild(li);
+    });
+
+    totalTimeDisplay.textContent = `Gesamtstunden: ${totalDuration.toFixed(1)} h`;
+}
+
+
+// Beim Laden der Seite das Datum setzen und Daten von der API abrufen
+document.addEventListener('DOMContentLoaded', () => {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById("entryDate").value = today;
+    
+    // Starte den Datenabruf, sobald die Seite geladen ist
+    fetchEntries(); 
+});
+</script>
+
+<h2>Neuer Berichtseintrag</h2>
+<div class="input-grid">
+    <label for="entryDate">Datum:</label>
+    <input type="date" id="entryDate">
+    
+</div>
+
+<textarea id="entryText" placeholder="Was hast du heute gemacht...
+Co dzisiaj robiłeś..."></textarea><br>
+<button onclick="addEntry()">Eintrag speichern</button>
+
+<h2>Alle Berichte</h2>
+<ul id="entriesList"></ul>
+
+</body>
+</html>

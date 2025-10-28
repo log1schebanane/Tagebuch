@@ -1,0 +1,46 @@
+# 1. Deployment für das Python Backend
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: berichtsheft-api-deployment
+  labels:
+    app: berichtsheft-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: berichtsheft-api
+  template:
+    metadata:
+      labels:
+        app: berichtsheft-api
+    spec:
+      containers:
+      - name: api
+        image: log1schebanane/tagebuch-backend:1.0 # Dein gepushtes Image
+        ports:
+        - containerPort: 5000 # Der Port, den deine Flask-Anwendung nutzt
+        env:
+        # DB-Konfiguration, damit die API weiß, wo die MariaDB läuft
+        - name: MARIADB_SERVICE_HOST
+          value: "mariadb-service" # Der Name des MariaDB Services!
+        - name: MARIADB_USER
+          value: "azubi_user"
+        - name: MARIADB_PASSWORD
+          value: "AzubiPasswort" # Passe dein Passwort an!
+        - name: MARIADB_DATABASE
+          value: "berichtsheft_db"
+---
+# 2. Service für das Python Backend (ClusterIP)
+apiVersion: v1
+kind: Service
+metadata:
+  name: letters
+spec:
+  selector:
+    app: berichtsheft-api
+  ports:
+    - protocol: TCP
+      port: 80 # Service-Port
+      targetPort: 5000 # Container-Port
+  type: ClusterIP # Nur innerhalb des Clusters erreichbar

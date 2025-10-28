@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: letters
-  namespace: letters
   labels:
     app: letters
 spec:
@@ -17,7 +16,7 @@ spec:
     spec:
       containers:
       - name: letters
-        image: log1schebanane/tagebuch:1.1
+        image: log1schebanane/tagebuch-frontend:1.0
         ports:
         - containerPort: 80
           name: http
